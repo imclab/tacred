@@ -56,7 +56,7 @@ You can evaluate a binarized model (which training produces automatically) via `
 You can produce predictions for the internal Stanford KBP pipeline via
 
 ```bash
-bin/query.py <args> | bin/pred.lua > extractions.tsv
+bin/query.py <args> | bin/pred.lua <args> > extractions.tsv
 ```
 
 This output file can then be loaded into the internal system as a KB table. Given the size of the internal corpus,
