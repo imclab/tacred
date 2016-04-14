@@ -115,7 +115,10 @@ while true do
   for i = 1, #I do
     local subj_id, obj_id = table.unpack(I[i])
     local r, s = preds[i], max_scores[i]
-    print(subj_id, r, obj_id, s)
+    r = vocab.label:wordAt(r)
+    if r ~= 'no_relation' then
+      print(subj_id, r, obj_id, s)
+    end
   end
 
   collectgarbage()
