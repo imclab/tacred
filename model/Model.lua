@@ -141,6 +141,7 @@ function Model:eval(data)
 end
 
 function Model:fit(dataset, callbacks)
+  assert(dataset)
   local opt = self.opt
   callbacks = callbacks or {}
 

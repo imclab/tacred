@@ -8,6 +8,7 @@ Predicts using a model
   --dataset (default dataset/sent/dataset.t7)   Dataset to use
   --gpu     (default 0)       Whether to use the gpu
   --typecheck  (default TACRED/typecheck.json)
+  --n_debug (default 5)       How many debug sentences to print per split
 ]]
 
 local tl = require 'torchlib'
@@ -82,8 +83,8 @@ local printable = function(stats)
 end
 
 local stats = {}
-for split, d in pairs(data) do
-  print('evaluation ' .. split)
+for split, d in pairs(dataset) do
+  print('evaluation ' .. split .. ':', d)
   local loss, pred, targ = model:eval(d)
   stats[split] = compute_stats(pred, targ)
   stats[split].loss = loss
