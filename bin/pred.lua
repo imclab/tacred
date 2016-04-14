@@ -72,6 +72,8 @@ while true do
   -- reset
   for i = 1, #X do
     X[i] = nil
+    T[i] = nil
+    I[i] = nil
   end
 
   -- read line

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     from docopt import docopt
     opt = docopt(__doc__)
     try:
-        conn = psycopg2.connect("dbname='{}' user='{}' host='{}' port={}".format(opt['<db>'], opt['<user>'], opt['<host>'], opt['port']))
+        conn = psycopg2.connect("dbname='{}' user='{}' host='{}' port={}".format(opt['<db>'], opt['<user>'], opt['<host>'], opt['<port>']))
     except Exception as e:
         print('cannot connect to database')
         raise e
@@ -36,5 +36,5 @@ if __name__ == '__main__':
         rows = cur.fetchmany(size=fetch_size)
         print(json.dumps(rows))
         num_fetched += len(rows)
-        if num_fetched > limit:
+        if limit > 0 and num_fetched > limit:
             break
