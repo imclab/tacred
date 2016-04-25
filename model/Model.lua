@@ -104,11 +104,12 @@ function Model:train(data)
   self:set_mode('train')
   local loss = 0
   for batch, batch_end in data:batches(opt.n_batch, opt) do
-    local x, y, t = tl.Dataset.pad(batch.X, opt.pad_index), torch.Tensor(batch.Y), batch.typecheck
+    local x, u = tl.Dataset.pad(batch.X, opt.pad_index), tl.Dataset.pad(batch.unks, opt.pad_index)
+    local y, t = torch.Tensor(batch.Y), batch.typecheck
     -- random corruption of words to UNK (index 1)
     if opt.p_corrupt ~= -1 then
-      local corrupt = x:clone():bernoulli(p_corrupt):cmul(x):gt(0) -- cmul again to avoid corrupting 0 indices aka PADs
-      x:maskedFill(corrupt, 1)
+      local corrupted = x:clone():bernoulli(p_corrupt):byte()
+      x:maskedCopy(corrupted, u:maskedSelect(corrupted))
     end
     self.set_batch(x, y, t)
     local _, optim_ret = optimize(self.ftrain, self.params, optim_opt)
@@ -174,7 +175,7 @@ function Model:fit(dataset, callbacks)
           torch.save(path.join(opt.save, k..'.cf.t7'), v.cf)
         end
       end
-      torch.save(path.join(opt.save, 'model'..epoch..'.t7'), self)
+      --torch.save(path.join(opt.save, 'model'..epoch..'.t7'), self)
       torch.save(path.join(opt.save, 'params'..epoch..'.t7'), self.params:float())
     end
   end
@@ -195,7 +196,7 @@ function Model:fit(dataset, callbacks)
     stats.dev.loss = loss
 
     if callbacks.debug then
-      callbacks.debug(dataset.dev.X, targ, pred)
+      callbacks.debug(dataset.dev.X, targ, pred, dataset.dev.unks)
     end
 
     if callbacks.log then

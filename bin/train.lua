@@ -16,8 +16,7 @@ Trains a model
   --rnn       (default FastLSTM)
   --p_corrupt (default 0.3)   Corruption rate
   --model   (default model/ConvMaxPool) Which model to use
-  --dataset (default dataset/sent/dataset.t7) Dataset to use
-  --vocab   (default dataset/sent/vocab.t7)   Vocab to use
+  --dataset (default dataset/sent) Directory where dataset and vocab are stored
   --seed    (default 42)      Seed for RNG
   --clamp   (default 5)       Gradient clamp
   --gpu     (default 0)       Whether to use the gpu
@@ -55,8 +54,8 @@ if args.gpu then
   cutorch.manualSeed(args.seed)
 end
 
-local dataset = torch.load(args.dataset)
-local vocab = torch.load(args.vocab)
+local dataset = torch.load(path.join(args.dataset, 'dataset.t7'))
+local vocab = torch.load(path.join(args.dataset, 'vocab.t7'))
 args.n_vocab = vocab.word:size()
 args.n_class = vocab.label:size()
 args.pad_index = vocab.word:indexOf('***PAD***')
