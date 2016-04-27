@@ -8,7 +8,7 @@ function Model:__init(opt)
   self.softmax = nn.SoftMax()
   self.typecheck = nn.Typecheck()
   self.criterion = self:get_criterion(opt)
-  if opt.gpu then
+  if opt.gpu > -1 then
     --print('moving model to gpu')
     self:cuda()
   end

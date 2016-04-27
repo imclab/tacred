@@ -42,7 +42,6 @@ if args.gpu > -1 then
   print('free mem '..free..' total mem '..total)
   cutorch.setDevice(id)
 else
-  args.gpu = nil
   require 'torch'
   require 'nn'
 end

@@ -3,6 +3,8 @@ local tl = require 'torchlib'
 local lapp = require 'pl.lapp'
 local pretty = require 'pl.pretty'
 local tablex = require 'pl.tablex'
+local stringx = require 'pl.stringx'
+local path = require 'pl.path'
 local args = lapp [[
 Converts the data to numerical torch objects
   -i, --input (default dataset/sent)  Input directory
@@ -80,6 +82,38 @@ local get_ent_unks = function(words)
   return unks
 end
 
+local cluster_map
+local get_cluster_unks = function(words)
+  if not cluster_map then
+    local map_file = 'egw4-reut.512.clusters'
+    assert(path.exists(map_file), map_file..' does not exist!')
+    cluster_map = {}
+    for line in io.lines(map_file) do
+      local tokens = stringx.split(stringx.rstrip(line, '\n'), '\t')
+      local word = tokens[1]
+      local index = tonumber(tokens[2])
+      cluster_map[assert(word, 'could not retrieve word')] = assert(index, 'could not retrieve index')
+    end
+  end
+  local unks = {}
+  for i, word in ipairs(words) do
+    local cluster = cluster_map[word] or 0
+    unks[i] = '***UNK-cluster'..cluster..'***'
+  end
+  return unks
+end
+
+local get_cluster_ner_unks = function(words, pos, ner)
+  local cluster_unks = get_cluster_unks(words)
+  local ner_unks = get_ner_unks(words, pos, ner)
+  for i, cunk in ipairs(cluster_unks) do
+    if cunk == '***UNK-cluster0***' then
+      cluster_unks[i] = ner_unks[i]
+    end
+  end
+  return cluster_unks
+end
+
 local convert = function(split, vocab, train)
   local fields = {X={}, Y={}, typecheck={}}
   if not train then fields.unks = {} end
@@ -94,6 +128,8 @@ local convert = function(split, vocab, train)
         ent = get_ent_unks,
         pos = get_pos_unks,
         ner = get_ner_unks,
+        cluster = get_cluster_unks,
+        cluster_ner = get_cluster_ner_unks,
       }
       local get_unks = assert(get_unks_map[args.unk], 'unsupported unk mode: '..args.unk)
       local unks = get_unks(x, split.pos[i], split.ner[i])
