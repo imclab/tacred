@@ -4,11 +4,10 @@ local opt = lapp [[
 Predicts using a model
   --n_batch   (default 128)   Batch size
   --save    (default saves/best) Which model to use
-  --vocab (default dataset/sent/vocab.t7)   Vocab to use
-  --dataset (default dataset/sent/dataset.t7)   Dataset to use
   --gpu     (default 0)       Whether to use the gpu
   --typecheck  (default TACRED/typecheck.json)
   --n_debug (default 5)       How many debug sentences to print per split
+  --output    (default '')      Where to store predicted output
 ]]
 
 local tl = require 'torchlib'
@@ -34,9 +33,12 @@ end
 require 'dpnn'
 require 'rnn'
 local json = require 'cjson'
+local file = require 'pl.file'
+local path = require 'pl.path'
+local dir = require 'pl.dir'
 
-local vocab = torch.load(opt.vocab)
-local dataset = torch.load(opt.dataset)
+local vocab = torch.load(path.join(opt.save, 'dataset/vocab.t7'))
+local dataset = torch.load(path.join(opt.save, 'dataset/dataset.t7'))
 
 local config = path.join(opt.save, 'opt.json')
 local model_opt = pretty.read(file.read(config))
@@ -74,22 +76,40 @@ local debug = function(X, Y, P)
   end
 end
 
+local record_predictions = function(pred, targ, scores, fname)
+  local gold, ans = '', ''
+  for i = 1, pred:size(1) do
+    gold = gold .. vocab.label:wordAt(targ[i]) .. '\n'
+    ans = ans .. vocab.label:wordAt(pred[i]) .. '\t' .. scores[i] .. '\n'
+  end
+  file.write(fname .. '.gold', gold)
+  file.write(fname .. '.pred', ans)
+end
+
 local printable = function(stats)
   local p = tl.util.tableCopy(stats)
-  for _, t in ipairs{'train', 'dev', 'test'} do
+  for _, t in ipairs{'test', 'dev', 'train'} do
     if p[t] then p[t].cf = nil end
   end
   return p
 end
 
+if not path.exists(opt.output) then
+  dir.makepath(opt.output)
+end
+
 local stats = {}
-for split, d in pairs(dataset) do
+for _, split in pairs{'test', 'dev', 'train'} do
+  local d = dataset[split]
   print('evaluation ' .. split .. ':', d)
-  local loss, pred, targ = model:eval(d)
+  local loss, pred, targ, scores = model:eval(d)
   stats[split] = compute_stats(pred, targ)
   stats[split].loss = loss
   print('examples')
   debug(d.X, targ, pred)
+  if opt.output ~= '' then
+    record_predictions(pred, targ, scores, path.join(opt.output, split))
+  end
 end
 
 print('scores')

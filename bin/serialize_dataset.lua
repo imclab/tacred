@@ -9,6 +9,7 @@ local corenlp = require 'corenlp'
 local args = lapp [[
 Converts the data to torch objects
   -i, --input  (default TACRED)  Input directory
+  --train      (default train)   Train file to use
   -o, --output (default dataset/sent) Output directory
   -m, --mode   (default sent)    How to tokenize the sequence
 ]]
@@ -22,7 +23,7 @@ local typecheck = json.decode(file.read(path.join(args.input, 'typecheck.json'))
 
 local c
 local to_sent = function(raw, i)
-  if not c then c = corenlp.Client() end
+  if not c then c = corenlp.Client('http://localhost:9001') end
   local sequence = {}
   local pos_sequence = {}
   local ner_sequence = {}
@@ -89,6 +90,7 @@ local to_sent = function(raw, i)
   end
   assert(#sequence == #pos_sequence)
   assert(#sequence == #ner_sequence)
+  if not (subj_ner and obj_ner) then return nil end
   return sequence, assert(typecheck[subj_ner..' '..obj_ner]), pos_sequence, ner_sequence
 end
 
@@ -96,7 +98,7 @@ local to_sequence_map = {sent=to_sent}
 local to_sequence = to_sequence_map[args.mode]
 assert(to_sequence)
 
-for _, split in ipairs{'train', 'dev', 'test'} do
+for _, split in ipairs{args.train, 'dev', 'test'} do
   print('loading '..split..'...')
   local raw = tl.Dataset.from_conll(path.join(args.input, split .. '.conll'))
   print('  loaded '..raw:size()..' examples')
@@ -104,11 +106,13 @@ for _, split in ipairs{'train', 'dev', 'test'} do
   local fields = {X={}, Y={}, pos={}, ner={}, candidates={}}
   for i = 1, raw:size() do
     local sequence, candidates, pos, ner = to_sequence(raw, i)
-    table.insert(fields.X, sequence)
-    table.insert(fields.Y, raw.label[i])
-    table.insert(fields.pos, pos)
-    table.insert(fields.ner, ner)
-    table.insert(fields.candidates, candidates)
+    if sequence then
+      table.insert(fields.X, sequence)
+      table.insert(fields.Y, raw.label[i])
+      table.insert(fields.pos, pos)
+      table.insert(fields.ner, ner)
+      table.insert(fields.candidates, candidates)
+    end
   end
 
   torch.save(path.join(args.output, split..'.t7'), tl.Dataset(fields))

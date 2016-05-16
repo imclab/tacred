@@ -11,6 +11,8 @@ Converts the data to numerical torch objects
   -o, --output (default dataset/sent) Output directory
   -l, --lower  Lowercase words
   -c, --cutoff (default 3)       Words occuring less than this number of times will be replace with UNK
+  -n, --replace_ent_with_ner         Replace entity span with NER tag
+  -t, --train      (default train)   Training set name
   --embeddings (default random)  Which embeddings to use
   --unk        (default rare)    How to encode rare words. Can be {rare, ent, pos}
 ]]
@@ -23,7 +25,9 @@ end
 local dataset = {}
 for _, split in ipairs{'train', 'dev', 'test'} do
   print('loading '..split..'...')
-  dataset[split] = torch.load(path.join(args.input, split..'.t7'))
+  local fname = split
+  if split == 'train' then fname = args.train end
+  dataset[split] = torch.load(path.join(args.input, fname..'.t7'))
   print('  loaded '..dataset[split]:size()..' examples')
 end
 
@@ -129,18 +133,34 @@ local convert = function(split, vocab, train)
         pos = get_pos_unks,
         ner = get_ner_unks,
         cluster = get_cluster_unks,
-        cluster_ner = get_cluster_ner_unks,
+        cluster_ner = get_cluster_ner_unks,  -- todo: remove me
+        clusterner = get_cluster_ner_unks,
       }
       local get_unks = assert(get_unks_map[args.unk], 'unsupported unk mode: '..args.unk)
       local unks = get_unks(x, split.pos[i], split.ner[i])
+      assert(#x == #unks, 'input sequence has len '..#x..' but unk has len '..#unks)
       local words = {}
-      for i, w in ipairs(x) do
-        if vocab.word:contains(w) then
-          table.insert(words, w)
+      local in_subj, in_obj
+      for j, w in ipairs(x) do
+        if w == '</subj>' then in_subj = false end
+        if w == '</obj>' then in_obj = false end
+        if args.replace_ent_with_ner and in_subj then
+          unks[j] = 'SUBJ-'..split.ner[i][j]
+          table.insert(words, unks[j])
+        elseif args.replace_ent_with_ner and in_obj then
+          unks[j] = 'OBJ-'..split.ner[i][j]
+          table.insert(words, unks[j])
         else
-          table.insert(words, unks[i])
+          if vocab.word:contains(w) then
+            table.insert(words, w)
+          else
+            table.insert(words, unks[j])
+          end
         end
+        if w == '<subj>' then in_subj = true end
+        if w == '<obj>' then in_obj = true end
       end
+      assert(#words == #unks, 'output sequence has len '..#words..' but unk has len '..#unks)
       table.insert(words, '***END***')
       table.insert(unks, '***END***')
       table.insert(fields.X, torch.Tensor(vocab.word:indicesOf(words, true)))

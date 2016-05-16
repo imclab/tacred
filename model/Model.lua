@@ -1,6 +1,15 @@
 local optim = require 'optim'
 require 'model/Typecheck'
 
+local tl = require 'torchlib'
+local nn = require 'nn'
+local torch = require 'torch'
+local xlua = require 'xlua'
+local pretty = require 'pl.pretty'
+local dir = require 'pl.dir'
+local path = require 'pl.path'
+local tablex = require 'pl.tablex'
+
 local Model = torch.class('Model')
 function Model:__init(opt)
   self.opt = opt
@@ -57,7 +66,11 @@ function Model:get_functions()
     for i = 1, x:size(1) do
       typecheck[i] = one_hot:forward(torch.Tensor(new_typecheck[i])):sum(1)
       typecheck[i][1] = 1
-      assert(typecheck[i][y[i]] == 1, 'rel: '..y[i]..' typecheck: '..tostring(typecheck[i]))
+      if not typecheck[i][y[i]] == 1 then
+        typecheck[i][y[i]] = 1
+        print('warning: rel: '..y[i]..' typecheck: '..tostring(typecheck[i]))
+      end
+
     end
     if self.opt.gpu > -1 then
       x = x:cuda()
@@ -87,7 +100,7 @@ function Model:get_functions()
     local typechecked = self.typecheck:forward{scores, typecheck}
     local loss = self.criterion:forward(typechecked, y)
     local max_scores, preds = self.softmax:forward(typechecked):max(2)
-    return loss, preds:squeeze(2)
+    return loss, preds:squeeze(2), max_scores:squeeze(2)
   end
   return set_batch, ftrain, predict
 end
@@ -123,22 +136,24 @@ end
 
 function Model:eval(data)
   local opt = self.opt
-  local loss, pred, targ = 0, {}, {}
+  local loss, pred, targ, scores = 0, {}, {}, {}
   self:set_mode('evaluate')
   for batch, batch_end in data:batches(opt.n_batch, opt) do
     local x, y, t = tl.Dataset.pad(batch.X, opt.pad_index), torch.Tensor(batch.Y), batch.typecheck
     self.set_batch(x, y, t)
-    local loss_, pred_ = self.predict()
+    local loss_, pred_, scores_ = self.predict()
     loss = loss + loss_
     tl.util.extend(pred, pred_:totable())
     tl.util.extend(targ, y:totable())
+    tl.util.extend(scores, scores_:totable())
     if not opt.silent then
       xlua.progress(batch_end, data:size())
     end
   end
   pred = torch.Tensor(pred)
   targ = torch.Tensor(targ)
-  return loss/data:size(), pred, targ
+  scores = torch.Tensor(scores)
+  return loss/data:size(), pred, targ, scores
 end
 
 function Model:fit(dataset, callbacks)
@@ -182,7 +197,7 @@ function Model:fit(dataset, callbacks)
 
 
   for epoch = 1, opt.n_epoch do
-    stats = {epoch=epoch, train={}, dev={}}
+    local stats = {epoch=epoch, train={}, dev={}}
     collectgarbage()
     dataset.train:shuffle()
     print('epoch '..epoch)

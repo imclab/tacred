@@ -2,12 +2,13 @@
 """Pulls in data stream from KPB and converts it to JSON to print to stdout
 
 Usage:
-    query.py <host> <port> <db> <user> [--limit=<N>] [--fetch_size=<N>] [--dump_file=<F>]
+    query.py <host> <port> <db> <user> [--limit=<N>] [--fetch_size=<N>] [--dump_file=<F>] [--year=<Y>]
 
 Options:
     --limit==<N>    How many rows to fetch in total. Set to 0 to pull in all rows. [default: 10]
     --fetch_size=<N> How many rows to fetch at a time. Results will be written out as a json list. [default: 10]
     --dump_file=<F> Where to dump the progress. Set to '' to not dump anything. [default: ]
+    --year=<Y>      If specified, then will only predict on results from that year.  [default: ]
 
 """
 import psycopg2
@@ -24,7 +25,9 @@ if __name__ == '__main__':
         raise e
 
     cur = conn.cursor(name='tacred')
-    query = """select words, subject_id, object_id, subject_ner, object_ner, subject_begin, subject_end, object_begin, object_end from test_data where subject_entity <> object_entity"""
+    query = """select words, ner_tags, subject_id, object_id, subject_ner, object_ner, subject_begin, subject_end, object_begin, object_end from test_data where subject_entity <> object_entity"""
+    if opt['--year'].strip():
+        query += ' and corpus_id={}'.format(int(opt['--year'].strip()))
     limit = int(opt['--limit'])
     fetch_size = int(opt['--fetch_size'])
     if limit > 0:

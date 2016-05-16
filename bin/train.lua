@@ -108,3 +108,7 @@ end
 
 local model = require(args.model).new(args)
 model:fit(dataset, {stats=compute_stats, debug=debug, log=log})
+
+-- symlink the dataset that was used with this run
+local lfs = require 'lfs'
+lfs.link(path.abspath(opt.dataset), path.join(path.abspath(opt.save, 'dataset')), true)
